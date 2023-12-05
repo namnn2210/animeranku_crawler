@@ -16,15 +16,23 @@ def get_news_links(page_url):
     soup = get_soup_url(page_url)
     news_links = []
 
-    list_news = soup.find_all('div', {'class': 'article'})
+    list_news = soup.find_all('article')
     for news in list_news:
-        news_url = news.find('a', {'class': 'dc-img-link'})['href']
-        news_url = f'https://gamerant.com{news_url}'
+        print(news)
+        news_url_div = news.find(
+            'h6', {'class': 'cs-entry__title'})
+        if news_url_div:
+            news_url = news_url_div.find('a')['href']
+        else:
+            news_url = news.find(
+                'h2', {'class': 'cs-entry__title'}).find('a')['href']
+        # news_url = f'https://gamerant.com{news_url}'
         news_soup = get_soup_url(page_url=news_url)
         publish_time = news_soup.find(
             'meta', {'property': 'article:published_time'})['content']
         update_time_obj = parse(publish_time).date()
         if check_latest_news(update_time_obj):
+            print(news_url)
             news_links.append(news_url)
 
     return news_links
@@ -35,8 +43,9 @@ def scrape_news_links(base_url):
     all_news_links = []
 
     while True:
-        page_url = f"{base_url}{page_number}"
+        page_url = f"{base_url}"
         news_links = get_news_links(page_url)
+        print(news_links)
 
         if page_number == 1 and len(news_links) == 0:
             break
@@ -53,6 +62,7 @@ def scrape_news_links(base_url):
 
 def get_news(news_url):
     db = db_connect()
+    print(news_url)
     list_download_imgs = []
     img_count = 0
     news_soup = get_soup_url(news_url)
@@ -65,7 +75,7 @@ def get_news(news_url):
     news_author = news_soup.find(
         'meta', {'property': 'article:author'})['content']
     list_download_imgs.append({'url': news_thumb_url, 'path': formatted_thumb})
-    content_div = news_soup.find('section', {'id': 'article-body'})
+    content_div = news_soup.find('div', {'class': 'entry-content'})
 
     # Remove code-block
     # code_block = content_div.find('div', {'class': 'code-block'})
@@ -74,22 +84,26 @@ def get_news(news_url):
     # code_block.decompose()
 
     # Remove ads div
-    ads_divs = content_div.find_all('div', {'class': 'adsninja-ad-zone'})
+    ads_divs = content_div.find_all('div', {'id': 'ez-toc-container'})
     for div in ads_divs:
         div.unwrap()
-        
-    display_cards = content_div.find_all('div',{'class':'display-card'})
-    for div in display_cards:
-        div.decompose()
 
     # Remove related single
-    related_divs = content_div.find_all('span', {'class': 'related-single'})
+    related_divs = content_div.find_all('blockquote')
     for div in related_divs:
         div.unwrap()
 
     # remove next_single
-    next_single_divs = content_div.find_all('span', {'class': 'next-single'})
-    for div in next_single_divs:
+    # next_single_divs = content_div.find_all('span', {'class': 'next-single'})
+    # for div in next_single_divs:
+    #     div.decompose()
+
+    next_single_divs_1 = content_div.find_all('div', {'class': 'mv-ad-box'})
+    for div in next_single_divs_1:
+        div.decompose()
+
+    next_single_divs_2 = content_div.find_all('div', {'class': 'code-block'})
+    for div in next_single_divs_1:
         div.decompose()
 
     # Remove source href
@@ -97,18 +111,12 @@ def get_news(news_url):
     for link in a_link_source:
         link.unwrap()
 
-    # remove ads
-    ads_divs_2 = content_div.find_all(
-        'div', {'class': 'dynamically-injected-refresh-ad-zone'})
-    for div in ads_divs_2:
-        div.decompose()
-
     # Get list images
-    img_divs = content_div.find_all('div', {'class': 'body-img'})
+    img_divs = content_div.find_all('figure')
     for div in img_divs:
         img_count += 1
-        responsive_img = div.find('div', {'class': 'responsive-img'})
-        img_src = responsive_img['data-img-url']
+        responsive_img = div.find('img')
+        img_src = responsive_img['src']
         print(f'======================== {img_src}')
         new_img_name = f'{news_slug}_{img_count}.jpg'
         formatted_img_name = os.path.join(
@@ -153,14 +161,14 @@ def get_news(news_url):
         'deleted_at': None,
     }
     print(news)
-    news_obj = MangaAnimeNews(**news)
-    insert_db(db=db, news_obj=news_obj)
-    update_idx(db=db, slug=news_slug)
+    # news_obj = MangaAnimeNews(**news)
+    # insert_db(db=db, news_obj=news_obj)
+    # update_idx(db=db, slug=news_slug)
     db.close()
 
 
 if __name__ == "__main__":
-    url = 'https://gamerant.com/anime/'
+    url = 'https://amazfeed.com/manga/'
     all_links = scrape_news_links(url)
 
     for link in all_links:

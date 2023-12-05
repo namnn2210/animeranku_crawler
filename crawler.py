@@ -2,34 +2,39 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 from database import MangaAnimeNews
 from hashids import Hashids
+from urllib.request import Request, urlopen
 
 import config
 import requests
 import os
 
+header = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 6.2; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/32.0.1667.0 Safari/537.36'
+}
+
+
 def get_soup_url(page_url):
-    proxies = {
-        'http': 'http://71.86.129.131:8080',
-    }
-    s = requests.Session()
-    # s.proxies = proxies
-    page_res = s.get(page_url).text
-    # server_ip = page_res.raw._connection.sock.getpeername()[0]
-    # print(f"Server IP Address: {server_ip}")
-    return BeautifulSoup(page_res, 'html.parser')
+
+    return BeautifulSoup(urlopen(Request(url=page_url, headers=header)), 'html.parser')
+
 
 def check_latest_news(update_time):
     today = datetime.today().date()
     return update_time >= (today - timedelta(days=3))
 
+
 def get_basic_info(news_soup):
-    news_title = news_soup.find('meta',{'property':'og:title'})['content']
-    news_thumb_url = news_soup.find('meta',{'property':'og:image'})['content']
-    news_description = news_soup.find('meta',{'property':'og:description'})['content']
+    news_title = news_soup.find('meta', {'property': 'og:title'})['content']
+    news_thumb_url = news_soup.find(
+        'meta', {'property': 'og:image'})['content']
+    news_description = news_soup.find(
+        'meta', {'property': 'og:description'})['content']
     return news_title, news_thumb_url, news_description
 
+
 def insert_db(db, news_obj):
-    news_exists = db.query(MangaAnimeNews).filter(MangaAnimeNews.slug == news_obj.slug).count()
+    news_exists = db.query(MangaAnimeNews).filter(
+        MangaAnimeNews.slug == news_obj.slug).count()
     if news_exists == 0:
         try:
             db.add(news_obj)
@@ -38,19 +43,22 @@ def insert_db(db, news_obj):
             print(str(ex))
             db.rollback()
 
+
 def update_idx(db, slug):
-    db_news = db.query(MangaAnimeNews).filter(MangaAnimeNews.slug == slug).first()
+    db_news = db.query(MangaAnimeNews).filter(
+        MangaAnimeNews.slug == slug).first()
     if db_news:
         news_id = db_news.id
         idx = hashidx(news_id)
         try:
-            db.query(MangaAnimeNews).filter(MangaAnimeNews.id == news_id).update({'idx': idx})
+            db.query(MangaAnimeNews).filter(
+                MangaAnimeNews.id == news_id).update({'idx': idx})
             db.commit()
         except Exception as ex:
             print(str(ex))
             db.rollback()
-        
-    
+
+
 def download_img(list_download_imgs):
     for download_img in list_download_imgs:
         url = download_img['url']
@@ -63,10 +71,13 @@ def download_img(list_download_imgs):
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
             with open(save_path, "wb") as f:
                 f.write(response.content)
-                
+
+
 def hashidx(id):
-    hashids = Hashids(salt='TIND', alphabet='abcdefghijklmnopqrstuvwxyz1234567890', min_length=7)
+    hashids = Hashids(
+        salt='TIND', alphabet='abcdefghijklmnopqrstuvwxyz1234567890', min_length=7)
     return hashids.encode(id)
+
 
 if __name__ == "__main__":
     proxies = {
@@ -76,7 +87,7 @@ if __name__ == "__main__":
     # print (r.status_code, r.reason)
     s = requests.Session()
     # s.proxies = proxies
-    
+
     url = 'http://api.ipify.org'
 
     try:
